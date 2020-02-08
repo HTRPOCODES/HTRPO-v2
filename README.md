@@ -2,7 +2,11 @@
 
 ## Introduction
 
-This is a deep reinforcement learning package including our newly proposed algorithm **Hindsight Trust Region Policy Optimization**. A demo video is in demo/ which shows how our algorithm works.
+This is a deep reinforcement learning package including our newly proposed algorithm **Hindsight Trust Region Policy Optimization**.
+
+### Demo Video
+
+A demo video is in demo/ which shows how our algorithm works.
 
 ### Requirements
 
