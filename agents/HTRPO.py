@@ -29,7 +29,7 @@ class HTRPO(TRPO):
         self.per_decision = config['per_decision']
         self.weight_is = config['weighted_is']
         assert self.goal_space, "No goal sampling space is specified."
-        self.using_active_goals = config['using_active_goals']
+        self.using_hgf_goals = config['using_hgf_goals']
         self.env = config['env']
         self.max_steps = self.env.max_episode_steps
         self.using_original_data = config['using_original_data']
@@ -65,10 +65,13 @@ class HTRPO(TRPO):
                 self.optimizer = self.optimizer_type(self.policy.parameters(), lr=self.lr)
 
     def generate_subgoals(self):
-        if not self.using_active_goals:
+        if not self.using_hgf_goals:
             # generate subgoals randomly
-            # TODO: SUPPORT GOAL SAMPLING
-            self.subgoals = None
+            ind = list(range(self.subgoals.shape[0]))
+            random.shuffle(ind)
+            size = min(self.sampled_goal_num, self.subgoals.shape[0])
+            ind = ind[:size]
+            self.subgoals = self.subgoals[ind]
         else:
             # generate subgoals from sampled data
             ags = self.achieved_goal.cpu().numpy()
@@ -76,23 +79,23 @@ class HTRPO(TRPO):
             self.subgoals = np.unique(ags.round(decimals=2), axis=0)
 
             if self.sampled_goal_num is not None:
-                dg = np.unique(self.desired_goal.cpu().numpy().round(decimals=2), axis=0)
-                dg_max = np.max(dg, axis=0)
-                dg_min = np.min(dg, axis=0)
+                # dg = np.unique(self.desired_goal.cpu().numpy().round(decimals=2), axis=0)
+                # dg_max = np.max(dg, axis=0)
+                # dg_min = np.min(dg, axis=0)
+                #
+                # g_ind = (dg_min != dg_max)
 
-                g_ind = (dg_min != dg_max)
+                # subgoals = self.subgoals[np.sum((self.subgoals[:, g_ind] > dg_max[g_ind]) |
+                #                                 (self.subgoals[:, g_ind] < dg_min[g_ind]), axis = -1) == 0]
 
-                subgoals = self.subgoals[np.sum((self.subgoals[:, g_ind] > dg_max[g_ind]) |
-                                                (self.subgoals[:, g_ind] < dg_min[g_ind]), axis = -1) == 0]
-
-                if subgoals.shape[0] == 0:
-                    dist_to_dg_center = np.linalg.norm(self.subgoals - np.mean(dg, axis = 0), axis=1)
-                    ind_subgoals = np.argsort(dist_to_dg_center)
-                    self.subgoals = np.unique(np.concatenate([
-                        self.subgoals[ind_subgoals[:self.sampled_goal_num]], subgoals
-                    ], axis=0), axis=0)
-                else:
-                    self.subgoals = subgoals
+                # if subgoals.shape[0] == 0:
+                #     dist_to_dg_center = np.linalg.norm(self.subgoals - np.mean(dg, axis = 0), axis=1)
+                #     ind_subgoals = np.argsort(dist_to_dg_center)
+                #     self.subgoals = np.unique(np.concatenate([
+                #         self.subgoals[ind_subgoals[:self.sampled_goal_num]], subgoals
+                #     ], axis=0), axis=0)
+                # else:
+                #     self.subgoals = subgoals
 
                 size = min(self.sampled_goal_num, self.subgoals.shape[0])
 
@@ -163,6 +166,11 @@ class HTRPO(TRPO):
     def learn_hpg(self):
         self.sample_batch()
         self.split_episode()
+
+        # No valid episode is collected
+        if self.n_valid_ep == 0:
+            return
+
         # TODO using reasonable subgoals instead of random ones
         self.generate_subgoals()
         if not self.using_original_data:
@@ -173,10 +181,6 @@ class HTRPO(TRPO):
         if self.norm_ob:
             self.ob_rms['observation'].update(self.s.cpu().numpy())
             self.ob_rms['desired_goal'].update(self.goal.cpu().numpy())
-            self.ob_mean = self.ob_rms['observation'].mean
-            self.ob_var = self.ob_rms['observation'].var
-            self.goal_mean = self.ob_rms['desired_goal'].mean
-            self.goal_var = self.ob_rms['desired_goal'].var
 
         if self.norm_ob:
             self.s = torch.clamp((self.s - torch.Tensor(self.ob_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
@@ -216,17 +220,23 @@ class HTRPO(TRPO):
         self.cur_kl = self.mean_kl_divergence().item()
         self.policy_ent = self.compute_entropy().item()
 
-    def learn_trpo(self):
-        self.sample_batch()
-        self.split_episode()
-
         if self.norm_ob:
-            self.ob_rms['observation'].update(self.s.cpu().numpy())
-            self.ob_rms['desired_goal'].update(self.goal.cpu().numpy())
             self.ob_mean = self.ob_rms['observation'].mean
             self.ob_var = self.ob_rms['observation'].var
             self.goal_mean = self.ob_rms['desired_goal'].mean
             self.goal_var = self.ob_rms['desired_goal'].var
+
+    def learn_trpo(self):
+        self.sample_batch()
+        self.split_episode()
+
+        # No valid episode is collected
+        if self.n_valid_ep == 0:
+            return
+
+        if self.norm_ob:
+            self.ob_rms['observation'].update(self.s.cpu().numpy())
+            self.ob_rms['desired_goal'].update(self.goal.cpu().numpy())
 
         if self.norm_ob:
             self.s = torch.clamp((self.s - torch.Tensor(self.ob_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
@@ -264,10 +274,20 @@ class HTRPO(TRPO):
         self.cur_kl = self.mean_kl_divergence().item()
         self.policy_ent = self.compute_entropy().item()
 
+        if self.norm_ob:
+            self.ob_mean = self.ob_rms['observation'].mean
+            self.ob_var = self.ob_rms['observation'].var
+            self.goal_mean = self.ob_rms['desired_goal'].mean
+            self.goal_var = self.ob_rms['desired_goal'].var
+
     def learn_htrpo(self):
         b_t = time.time()
         self.sample_batch()
         self.split_episode()
+
+        # No valid episode is collected
+        if self.n_valid_ep == 0:
+            return
 
         self.generate_subgoals()
         if not self.using_original_data:
@@ -278,10 +298,6 @@ class HTRPO(TRPO):
         if self.norm_ob:
             self.ob_rms['observation'].update(self.s.cpu().numpy())
             self.ob_rms['desired_goal'].update(self.goal.cpu().numpy())
-            self.ob_mean = self.ob_rms['observation'].mean
-            self.ob_var = self.ob_rms['observation'].var
-            self.goal_mean = self.ob_rms['desired_goal'].mean
-            self.goal_var = self.ob_rms['desired_goal'].var
 
         if self.norm_ob:
             self.s = torch.clamp((self.s - torch.Tensor(self.ob_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
@@ -335,6 +351,12 @@ class HTRPO(TRPO):
         self.cur_kl = self.mean_kl_divergence().item()
         self.policy_ent = self.compute_entropy().item()
         print("iteration time:   {:.4f}".format(time.time()-b_t))
+
+        if self.norm_ob:
+            self.ob_mean = self.ob_rms['observation'].mean
+            self.ob_var = self.ob_rms['observation'].var
+            self.goal_mean = self.ob_rms['desired_goal'].mean
+            self.goal_var = self.ob_rms['desired_goal'].var
 
     def update_value(self, inds = None):
         if inds is None:
@@ -421,7 +443,7 @@ class HTRPO(TRPO):
             delta[e_points] = self.r[e_points] - values[e_points]
             # TODO: deal with fake_done of the hindsight data.
             if fake_done.numel() > 0:
-                delta[fake_done] += self.value(self.s_[fake_done], self.goal[fake_done]).resize_as(delta[fake_done])
+                delta[fake_done] += self.value(self.s_[fake_done], self.other_data[fake_done]).resize_as(delta[fake_done])
             advantages[e_points] = delta[e_points]
             returns[e_points] = self.r[e_points]
             for i in range(1, max_len):
@@ -485,14 +507,15 @@ class HTRPO_Gaussian(HTRPO, TRPO_Gaussian):
 
         # load data
         if gym_states:
-            states = demos["gym_observations"]
+            states = [demos[i]["gym_observations"] for i in range(len(demos))]
         else:
-            states = demos["states"]
-        actions = demos["actions"]
+            states = [demos[i]["states"] for i in range(len(demos))]
+        actions = [demos[i]["actions"] for i in range(len(demos))]
+        gripper_actuations = [demos[i]["gripper_actuations"] for i in range(len(demos))]
         state_lens_sort_ind = list(np.argsort([s.shape[0] for s in states]))
         if train_configs["num_ep_selected"]:
             state_lens_sort_ind = state_lens_sort_ind[:train_configs["num_ep_selected"]]
-        goals = demos["achieved_goals"]
+        goals = [demos[i]["achieved_goals"] for i in range(len(demos))]
         assert len(states) == len(actions) == len(goals), "sizes of states, actions and goals do not match."
 
         data_size = sum([states[i].shape[0] for i in state_lens_sort_ind])
@@ -504,6 +527,9 @@ class HTRPO_Gaussian(HTRPO, TRPO_Gaussian):
 
         # normalized action can result in better performance
         all_data_actions = np.concatenate([actions[i] for i in state_lens_sort_ind], axis=0)
+        all_data_grippers = np.concatenate([gripper_actuations[i] for i in state_lens_sort_ind], axis=0)
+        all_data_actions = np.concatenate((all_data_actions, all_data_grippers), axis=1)
+
         action_mean = None
         action_std = None
         if train_configs["using_act_norm"]:
@@ -516,10 +542,10 @@ class HTRPO_Gaussian(HTRPO, TRPO_Gaussian):
         if self.norm_ob:
             self.ob_rms['observation'].update(all_data_states)
             self.ob_rms['desired_goal'].update(all_data_goals)
-            self.ob_mean = np.concatenate((self.ob_rms['observation'].mean, self.ob_rms['desired_goal'].mean),
-                                          axis=-1)
-            self.ob_var = np.concatenate((self.ob_rms['observation'].var, self.ob_rms['desired_goal'].var),
-                                         axis=-1)
+            self.ob_mean = self.ob_rms['observation'].mean
+            self.ob_var = self.ob_rms['observation'].var
+            self.goal_mean = self.ob_rms['desired_goal'].mean
+            self.goal_var = self.ob_rms['desired_goal'].var
 
         loss_fn = nn.MSELoss()
 
@@ -549,17 +575,22 @@ class HTRPO_Gaussian(HTRPO, TRPO_Gaussian):
                 action_batch = data_actions[inds[start: end]]
                 goal_batch = data_goals[inds[start: end]]
 
-                input = np.concatenate((state_batch, goal_batch), axis=1)
-                self.s = self.s.resize_(input.shape).copy_(torch.Tensor(input))
+                self.s = self.s.resize_(state_batch.shape).copy_(torch.Tensor(state_batch))
+                self.goal = torch.Tensor(goal_batch).type_as(self.s)
 
                 if self.norm_ob:
                     self.s = torch.clamp(
                         (self.s - torch.Tensor(self.ob_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
                             torch.clamp(torch.Tensor(self.ob_var), 1e-4).type_as(self.s).unsqueeze(0)), -5, 5)
+                    self.goal = torch.clamp(
+                        (self.goal - torch.Tensor(self.goal_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
+                            torch.clamp(torch.Tensor(self.goal_var), 1e-4).type_as(self.s).unsqueeze(0)), -5, 5)
+
+                self.other_data = self.goal
 
                 self.a = self.a.resize_(action_batch.shape).copy_(torch.Tensor(action_batch))
 
-                mu, logsigma, sigma = self.policy(self.s)
+                mu, logsigma, sigma = self.policy(self.s, self.other_data)
                 # logp_expert = self.compute_logp(mu, logsigma, sigma, self.a)
                 # loss = -torch.mean(logp_expert) - self.entropy_weight * self.compute_entropy()
                 loss = loss_fn(mu, self.a)
@@ -639,14 +670,18 @@ class HTRPO_Gaussian(HTRPO, TRPO_Gaussian):
             expanded_g = self.subgoals.unsqueeze(1).repeat(1, ep_len, 1).reshape(-1, self.d_goal)
                          # - self.episodes[ep]['achieved_goal'].unsqueeze(0).repeat(n_g,1,1).reshape(-1, self.d_goal)
             if self.norm_ob:
-                expanded_s = torch.clamp(
+                fake_input_s = torch.clamp(
                     (expanded_s - torch.Tensor(self.ob_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
                         torch.clamp(torch.Tensor(self.ob_var), 1e-4).type_as(self.s).unsqueeze(0)), -5, 5)
-                expanded_g = torch.clamp(
+                fake_input_g = torch.clamp(
                     (expanded_g - torch.Tensor(self.goal_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
                         torch.clamp(torch.Tensor(self.goal_var), 1e-4).type_as(self.s).unsqueeze(0)), -5, 5)
 
-            fake_mu, fake_logsigma, fake_sigma = self.policy(expanded_s, other_data = expanded_g)
+            else:
+                fake_input_s = expanded_s
+                fake_input_g = expanded_g
+
+            fake_mu, fake_logsigma, fake_sigma = self.policy(fake_input_s, other_data = fake_input_g)
             fake_mu = fake_mu.detach()
             fake_sigma = fake_sigma.detach()
             fake_logsigma = fake_logsigma.detach()
@@ -916,15 +951,18 @@ class HTRPO_Softmax(HTRPO, TRPO_Softmax):
             # - self.episodes[ep]['achieved_goal'].unsqueeze(0).repeat(n_g,1,1).reshape(-1, self.d_goal)
 
             if self.norm_ob:
-                expanded_s = torch.clamp(
+                fake_input_s = torch.clamp(
                     (expanded_s - torch.Tensor(self.ob_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
                         torch.clamp(torch.Tensor(self.ob_var), 1e-4).type_as(self.s).unsqueeze(0)), -5, 5)
-                expanded_g = torch.clamp(
+                fake_input_g = torch.clamp(
                     (expanded_g - torch.Tensor(self.goal_mean).type_as(self.s).unsqueeze(0)) / torch.sqrt(
                         torch.clamp(torch.Tensor(self.goal_var), 1e-4).type_as(self.s).unsqueeze(0)), -5, 5)
+            else:
+                fake_input_s = expanded_s
+                fake_input_g = expanded_g
 
             # Ng * T x Na
-            fake_distri = self.policy(expanded_s, other_data = expanded_g).detach()
+            fake_distri = self.policy(fake_input_s, other_data = fake_input_g).detach()
 
             # Ng * T x Da
             expanded_a = self.episodes[ep]['a'].repeat(n_g, 1)
@@ -1195,31 +1233,33 @@ def run_htrpo_train(env, agent, max_timesteps, logger, eval_interval = None, num
 
         print("------------------log information------------------")
         print("total_timesteps:".ljust(20) + str(timestep_counter))
-        print("iterations:".ljust(20) + str(agent.learn_step_counter) + " / " + str(int(total_updates)))
-        if agent.value_type is not None:
-            explained_var = explained_variance(agent.V.cpu().numpy(), agent.esti_R.cpu().numpy())
-            print("explained_var:".ljust(20) + str(explained_var))
-            logger.add_scalar("explained_var/train", explained_var, timestep_counter)
-        print("episode_len:".ljust(20) + "{:.1f}".format(np.mean([epinfo['l'] for epinfo in epinfobuf])))
-        rew = np.mean([epinfo['r'] for epinfo in epinfobuf]) + agent.max_steps
-        print("episode_rew:".ljust(20) + str(rew))
-        logger.add_scalar("episode_reward/train", rew, timestep_counter)
-        print("success_rate:".ljust(20) + "{:.3f}".format(100 * np.mean(success_history)) + "%")
-        logger.add_scalar("success_rate/train", np.mean(success_history), timestep_counter)
-        print("mean_kl:".ljust(20) + str(agent.cur_kl))
-        logger.add_scalar("mean_kl/train", agent.cur_kl, timestep_counter)
-        print("policy_ent:".ljust(20) + str(agent.policy_ent))
-        logger.add_scalar("policy_ent/train", agent.policy_ent, timestep_counter)
-        print("value_loss:".ljust(20) + str(agent.value_loss))
-        logger.add_scalar("value_loss/train", agent.value_loss, timestep_counter)
-        print("actual_imprv:".ljust(20) + "{:.5f}".format(agent.improvement))
-        logger.add_scalar("actual_imprv/train", agent.improvement, timestep_counter)
-        print("exp_imprv:".ljust(20) + "{:.5f}".format(agent.expected_improvement))
-        logger.add_scalar("exp_imprv/train", agent.expected_improvement, timestep_counter)
         print("valid_ep_ratio:".ljust(20) + "{:.3f}".format(agent.n_valid_ep / ep_num))
         logger.add_scalar("valid_ep_ratio/train", agent.n_valid_ep / ep_num, timestep_counter)
-
-        ep_num = 0
+        if agent.n_valid_ep > 0:
+            print("iterations:".ljust(20) + str(agent.learn_step_counter) + " / " + str(int(total_updates)))
+            if agent.value_type is not None:
+                explained_var = explained_variance(agent.V.cpu().numpy(), agent.esti_R.cpu().numpy())
+                print("explained_var:".ljust(20) + str(explained_var))
+                logger.add_scalar("explained_var/train", explained_var, timestep_counter)
+            print("episode_len:".ljust(20) + "{:.1f}".format(np.mean([epinfo['l'] for epinfo in epinfobuf])))
+            rew = np.mean([epinfo['r'] for epinfo in epinfobuf]) + agent.max_steps
+            print("episode_rew:".ljust(20) + str(rew))
+            logger.add_scalar("episode_reward/train", rew, timestep_counter)
+            print("success_rate:".ljust(20) + "{:.3f}".format(100 * np.mean(success_history)) + "%")
+            logger.add_scalar("success_rate/train", np.mean(success_history), timestep_counter)
+            print("mean_kl:".ljust(20) + str(agent.cur_kl))
+            logger.add_scalar("mean_kl/train", agent.cur_kl, timestep_counter)
+            print("policy_ent:".ljust(20) + str(agent.policy_ent))
+            logger.add_scalar("policy_ent/train", agent.policy_ent, timestep_counter)
+            print("value_loss:".ljust(20) + str(agent.value_loss))
+            logger.add_scalar("value_loss/train", agent.value_loss, timestep_counter)
+            print("actual_imprv:".ljust(20) + "{:.5f}".format(agent.improvement))
+            logger.add_scalar("actual_imprv/train", agent.improvement, timestep_counter)
+            print("exp_imprv:".ljust(20) + "{:.5f}".format(agent.expected_improvement))
+            logger.add_scalar("exp_imprv/train", agent.expected_improvement, timestep_counter)
+            ep_num = 0
+        else:
+            print("No valid episode was collected. Policy has not been updated.")
 
         if eval_interval and timestep_counter % eval_interval == 0:
             agent.save_model("output/models/HTRPO")
