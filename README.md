@@ -1,5 +1,9 @@
 # Hindsight Trust Region Policy Optimization
 
+## Log
+
+[08/03/2020] Fix some bugs including the failing of first update.
+
 ## Introduction
 
 This is a deep reinforcement learning package including our newly proposed algorithm **Hindsight Trust Region Policy Optimization**.
