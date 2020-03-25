@@ -129,9 +129,9 @@ HTRPO_CONFIG = {
     'goal_space': None,
     'per_decision': True,
     'weighted_is': True,
-    'using_active_goals' : True,
+    'using_hgf_goals' : True,
     'using_KL_estimation' : True,
     'using_hpg': False,
     'using_original_data': False,
-    'KL_esti_method_for_TRPO' : 'kl2'
+    'KL_esti_method_for_TRPO' : 'kl2',
 }

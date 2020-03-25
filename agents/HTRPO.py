@@ -79,23 +79,23 @@ class HTRPO(TRPO):
             self.subgoals = np.unique(ags.round(decimals=2), axis=0)
 
             if self.sampled_goal_num is not None:
-                # dg = np.unique(self.desired_goal.cpu().numpy().round(decimals=2), axis=0)
-                # dg_max = np.max(dg, axis=0)
-                # dg_min = np.min(dg, axis=0)
-                #
-                # g_ind = (dg_min != dg_max)
+                dg = np.unique(self.desired_goal.cpu().numpy().round(decimals=2), axis=0)
+                dg_max = np.max(dg, axis=0)
+                dg_min = np.min(dg, axis=0)
 
-                # subgoals = self.subgoals[np.sum((self.subgoals[:, g_ind] > dg_max[g_ind]) |
-                #                                 (self.subgoals[:, g_ind] < dg_min[g_ind]), axis = -1) == 0]
+                g_ind = (dg_min != dg_max)
 
-                # if subgoals.shape[0] == 0:
-                #     dist_to_dg_center = np.linalg.norm(self.subgoals - np.mean(dg, axis = 0), axis=1)
-                #     ind_subgoals = np.argsort(dist_to_dg_center)
-                #     self.subgoals = np.unique(np.concatenate([
-                #         self.subgoals[ind_subgoals[:self.sampled_goal_num]], subgoals
-                #     ], axis=0), axis=0)
-                # else:
-                #     self.subgoals = subgoals
+                subgoals = self.subgoals[np.sum((self.subgoals[:, g_ind] > dg_max[g_ind]) |
+                                                (self.subgoals[:, g_ind] < dg_min[g_ind]), axis = -1) == 0]
+
+                if subgoals.shape[0] == 0:
+                    dist_to_dg_center = np.linalg.norm(self.subgoals - np.mean(dg, axis = 0), axis=1)
+                    ind_subgoals = np.argsort(dist_to_dg_center)
+                    self.subgoals = np.unique(np.concatenate([
+                        self.subgoals[ind_subgoals[:self.sampled_goal_num]], subgoals
+                    ], axis=0), axis=0)
+                else:
+                    self.subgoals = subgoals
 
                 size = min(self.sampled_goal_num, self.subgoals.shape[0])
 
