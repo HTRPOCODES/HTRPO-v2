@@ -2,6 +2,8 @@
 
 ## Log
 
+[25/03/2020] Fix some bugs.
+
 [08/03/2020] Fix some bugs including the failing of first update.
 
 ## Introduction
