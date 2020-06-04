@@ -17,18 +17,11 @@ from agents.NAF import run_naf_train
 from agents.DDPG import run_ddpg_train
 from agents.TD3 import run_td3_train
 from agents.HTRPO import run_htrpo_train
+from agents.HPG import run_hpg_train
 from agents.config import *
-from configs import NAF_Reacherv2, NAF_Pendulumv0, AdaptiveKLPPO_Hopperv2, \
-    AdaptiveKLPPO_Reacherv2, DDPG_Reacherv2, PG_Hopperv2, \
-    PPO_Hopperv2, PPO_Reacherv2, TRPO_Swimmerv2, NPG_Hopperv2, \
-    TRPO_BaxterReacherv0, TRPO_Hopperv2, TRPO_Walker2dv1, \
-    DDPG_Swimmerv2, DDPG_Hopperv2, DDPG_Pendulumv0, HTRPO_FlipBit8, HTRPO_FlipBit16,\
-    HTRPO_EmptyMaze, HTRPO_FourRoomMaze, HTRPO_FetchPushv1, HTRPO_FetchReachv1, \
-    HTRPO_FetchSlidev1, HTRPO_FetchPushDiscrete, HTRPO_FetchPickAndPlacev1,\
-    HTRPO_FetchReachDiscrete, HTRPO_SawyerLift, HTRPO_SawyerPickPlaceCereal, \
-    HTRPO_SawyerPickPlaceCan, HTRPO_SawyerPickPlaceBread, HTRPO_HandManipulateBlockRotateZv0,\
-    HTRPO_HandReachv0, HTRPO_FetchSlideDiscrete, HTRPO_MsPacman, HTRPO_FlipBit32,\
-    HTRPO_FlipBit48
+import configs as cfgs
+import re
+import warnings
 
 torch.set_default_tensor_type(torch.FloatTensor)
 
@@ -84,6 +77,10 @@ def arg_parser():
                         help='whether to use imitation learning to improve performance')
     parser.add_argument('--demopath', default='demos',
                         help='path where you stores the demonstration file demo.hdf5. Now only HTRPO supported.')
+    parser.add_argument('--notearlyend', action='store_true', default=False,
+                        help='whether to end training when we got a policy that achieves 100% '
+                             'success rate during evalutaion, only for HTRPO')
+
 
     args = parser.parse_args()
     return args
@@ -92,7 +89,7 @@ if __name__ == "__main__":
     args = arg_parser()
 
     configs = {}
-    if args.alg in ("TD3", "NAF", "DDPG", "DQN", "DDQN", "DuelingDQN", "HTRPO"):
+    if args.alg in ("TD3", "NAF", "DDPG", "DQN", "DDQN", "DuelingDQN", "HTRPO", "HPG"):
         print("The chosen alg is off-policy. Stored transitions are not normalized.")
         configs['norm_ob'] = not args.unnormobs
         configs['norm_rw'] = not args.unnormret
@@ -121,10 +118,10 @@ if __name__ == "__main__":
     else:
         assert 0, "Invalid Environment"
 
-    if env_type not in {"mujoco", "robotics", "robotsuite"}:
-        print("The chosen env dose not support normalization. No normalization is applied.")
-        configs['norm_ob'] = False
-        configs['norm_rw'] = False
+    # if env_type not in {"mujoco", "robotics", "robotsuite"}:
+    #     print("The chosen env dose not support input normalization. No normalization is applied.")
+    #     configs['norm_ob'] = False
+    #     configs['norm_rw'] = False
 
     logger = SummaryWriter(comment = args.alg + "-" + args.env)
     output_dir = os.path.join("output", "models", args.alg)
@@ -132,16 +129,25 @@ if __name__ == "__main__":
         os.makedirs(output_dir)
 
     # initialize configurations
-    if os.path.exists(os.path.join("configs", args.alg + "_" + "".join(args.env.split("-")) + '.py')):
-        configs.update(eval(args.alg + "_" + "".join(args.env.split("-")) + "." + args.alg + "config"))
+    if "FlipBit" in env_id or "Maze" in env_id:
+        env_name_for_cfg = re.split(r'(\d+)', env_id)[0]
+    else:
+        env_name_for_cfg = env_id
+
+    if os.path.exists(os.path.join("configs", args.alg + "_" + "".join(env_name_for_cfg.split("-")) + '.py')):
+        configs.update(eval("cfgs." + args.alg + "_" + "".join(env_name_for_cfg.split("-")) + "." + args.alg + "config"))
+    else:
+        warnings.warn("No config file is matched. Using the default configs in agents.config.py.....")
+
     configs['n_states'] = n_states
     configs['n_action_dims'] = n_action_dims
     configs['dicrete_action'] = DICRETE_ACTION_SPACE
     if n_actions:
         configs['n_actions'] = n_actions
+    configs['reward_type'] = args.reward
 
     # for hindsight algorithms, init goal space of the environment.
-    if args.alg in {"HTRPO"}:
+    if args.alg in {"HTRPO", "HPG"}:
         configs['other_data'] = env.reset()
         assert isinstance(configs['other_data'], dict), \
             "Please check the environment settings, hindsight algorithms only support goal conditioned tasks."
@@ -150,7 +156,7 @@ if __name__ == "__main__":
         configs['env'] = env
 
     # init agent
-    if args.alg in ("PG", "NPG", "TRPO", "PPO", "AdaptiveKLPPO", "HTRPO"):
+    if args.alg in ("PG", "NPG", "TRPO", "PPO", "AdaptiveKLPPO", "HTRPO", "HPG"):
         if DICRETE_ACTION_SPACE:
             RL_brain = eval("agents." + args.alg + "_Softmax(configs)")
         else:
@@ -166,8 +172,8 @@ if __name__ == "__main__":
         RL_brain.load_model(load_path=output_dir, load_point=args.checkpoint)
 
     if args.usedemo:
-        assert args.alg in {"HTRPO"}, "Imitation learning warm-up only supports HTRPO."
-        demofile = os.path.join(args.demopath, env_id, "training_data.pkl")
+        assert args.alg in {"HTRPO", "HPG"}, "Imitation learning warm-up only supports HTRPO and HPG."
+        demofile = os.path.join(args.demopath, "demo.pkl")
         if not os.path.exists(demofile):
             raise RuntimeError("Demo file " + demofile + " does not exist.")
         train_configs = {
@@ -197,9 +203,9 @@ if __name__ == "__main__":
     elif args.alg == "TD3":
         trained_brain = run_td3_train(env, RL_brain, args.num_steps, logger, args.display)
     elif args.alg == 'HTRPO':
-        trained_brain = run_htrpo_train(env, RL_brain, args.num_steps, logger,
-                                        eval_interval = args.eval_interval if args.eval_interval > 0 else None,
-                                        num_evals = args.num_evals, render=args.render)
+        trained_brain = run_htrpo_train(env, RL_brain, args.num_steps, logger, args)
+    elif args.alg == 'HPG':
+        trained_brain = run_hpg_train(env, RL_brain, args.num_steps, logger, args)
     else:
         raise RuntimeError("Not an invalid algorithm.")
 
