@@ -26,3 +26,13 @@ def popart_update(weight, bias, mu_old, mu_new, sigma_old, sigma_new):
     :return:
     """
     return 1 / sigma_new * sigma_old * weight, 1 / sigma_new * (sigma_old * bias + mu_old - mu_new)
+
+def half_uniform_to_uniform(uniform_range, weight, axis = 0):
+    """
+    :param uniform_range: a N-d vector to define the range of the uniform distribution
+    :param weight: a scalar to define the weight of the two parts.
+    :param axis: which axis should be split into two parts.
+    :return: a transformer
+    """
+
+    pass

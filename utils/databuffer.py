@@ -15,7 +15,7 @@ class databuffer(object):
             self.n_actions = config['n_actions']
         self.actions_dims = config['n_action_dims']
         self.dicrete_action = config['dicrete_action']
-        if isinstance(self.state_dims, int):
+        if isinstance(self.state_dims, (int, np.int64)):
             self.state_dims = (self.state_dims, )
         self.S = np.zeros((0,) + self.state_dims, dtype = np.float32)
         self.A = np.zeros([0, self.actions_dims], dtype = np.uint8 if self.dicrete_action else np.float32)

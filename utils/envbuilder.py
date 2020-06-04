@@ -22,11 +22,8 @@ try:
 except ImportError:
     MPI = None
 
-HER_ENV_LIST = {"FlipBit8", "FlipBit16", "FlipBit32", "FlipBit48", "EmptyMaze", "FourRoomMaze", "FetchPushDiscrete",
-                "FetchReachDiscrete", "FetchSlideDiscrete", "MsPacman"}
-my_own_envs = {"BaxterReacher-v0", "FlipBit8", "FlipBit16", "FlipBit32", "FlipBit48", "EmptyMaze", "FourRoomMaze",
-               "FetchPushDiscrete", "FetchReachDiscrete", "FetchSlideDiscrete", "AntReacher", "Reacher",
-               "MsPacman"}
+my_own_envs = {"BaxterReacher", "FlipBit", "EmptyMaze", "FourRoomMaze",
+               "FetchPushDiscrete", "FetchReachDiscrete", "FetchSlideDiscrete", "MsPacman"}
 robotsuite_envs = {"BaxterLift", "BaxterPegInHole", "SawyerLift", "SawyerNutAssembly", "SawyerNutAssemblyRound",
                    "SawyerNutAssemblySingle", "SawyerNutAssemblySquare", "SawyerPickPlace", "SawyerPickPlaceBread",
                    "SawyerPickPlaceCan", "SawyerPickPlaceCereal", "SawyerPickPlaceMilk", "SawyerPickPlaceSingle",
@@ -41,7 +38,7 @@ for env in gym.envs.registry.all():
 def get_env_type(args):
     env_id = args.env
 
-    if env_id in my_own_envs:
+    if re.split(r'(\d+)', env_id)[0] in my_own_envs:
         return "myown", env_id
     elif env_id in robotsuite_envs:
         return "robotsuite", env_id
@@ -87,9 +84,9 @@ def build_env(args):
             env = make_vec_env(env_id, env_type, nenv, seed)
             env = VecFrameStack(env, frame_stack_size)
     else:
-        flatten_dict_observations = alg not in {'HTRPO'}
+        flatten_dict_observations = alg not in {'HTRPO', 'HPG'}
         env = make_vec_env(env_id, env_type, args.num_envs or 1, seed,
-                           flatten_dict_observations=flatten_dict_observations, render = args.render)
+                           flatten_dict_observations=flatten_dict_observations, render = args.render, reward = args.reward)
 
         if env_type in {'mujoco', 'robotics', 'robotsuite'} :
            env = VecNormalize(env, ob=not args.unnormobs, ret=not args.unnormret, act=not args.unnormact)
@@ -100,7 +97,7 @@ def make_vec_env(env_id, env_type, num_env, seed,
                  wrapper_kwargs=None,
                  start_index=0,
                  flatten_dict_observations=True,
-                 render = False):
+                 render = False, reward = "sparse"):
     """
     Create a wrapped, monitored SubprocVecEnv for Atari and MuJoCo.
     """
@@ -116,7 +113,8 @@ def make_vec_env(env_id, env_type, num_env, seed,
             seed=seed,
             wrapper_kwargs=wrapper_kwargs,
             flatten_dict_observations=flatten_dict_observations,
-            render = render
+            render = render,
+            reward = reward
         )
 
     set_global_seeds(seed)
@@ -128,24 +126,27 @@ def make_vec_env(env_id, env_type, num_env, seed,
 
 
 def make_env(env_id, env_type, subrank=0, seed=None, wrapper_kwargs=None,
-             flatten_dict_observations = True, render = False):
+             flatten_dict_observations = True, render = False, reward = "sparse"):
     wrapper_kwargs = wrapper_kwargs or {}
     if env_type == 'atari':
         env = make_atari(env_id)
     elif env_type == 'myown':
-        env = eval("envs." + "".join(env_id.split("-")) + "()")
+        env = envs.make_env(env_id, reward = reward)
     elif env_type == 'robotsuite':
-        env = eval("envs." + "".join(env_id.split("-")) + "(render = render)")
+        env = eval("envs." + "".join(env_id.split("-")) + "(render = render, reward = reward)")
     else:
         env = gym.make(env_id)
         env.max_episode_steps = env.spec.max_episode_steps
 
     if flatten_dict_observations and isinstance(env.observation_space, gym.spaces.Dict):
-        keys = env.observation_space.spaces.keys()
-        env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
+        keys = []
+        for key in env.observation_space.spaces.keys():
+            if key != "achieved_goal":
+                keys.append(key)
+        env = gym.wrappers.FlattenDictWrapper(env, dict_keys=keys)
 
     env.seed(seed + subrank if seed is not None else None)
-    if env_id not in my_own_envs and env_id not in robotsuite_envs:
+    if re.split(r'(\d+)', env_id)[0] not in my_own_envs and env_id not in robotsuite_envs:
         env = Monitor(env, allow_early_resets=True)
 
     if env_type == 'atari':
@@ -180,6 +181,3 @@ def set_global_seeds(i):
         pass
     np.random.seed(myseed)
     random.seed(myseed)
-
-def init_her_env(env):
-    pass
