@@ -72,7 +72,7 @@ python main.py --alg FlipBit32 --num_steps 2000000 --num_evals 200 --eval_interv
 
 #### Comparison with Baselines
 
-| <img src="results/baselines.png" width = "300" div align=left /> |
+| <img src="results/baselines.png" width = "600" div align=left /> |
 |:---:|
 | Comparison results|
 
