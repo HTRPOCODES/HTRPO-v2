@@ -67,7 +67,7 @@ All the listed names can be directly used in command line for training policies.
 To run FilpBit experiments (here 32 bits flipping is taken as an example):
 
 ```bash
-python main.py --alg FlipBit32 --num_steps 2000000 --num_evals 200 --eval_interval 1024 (--cpu)
+python main.py --alg HTRPO --env FlipBit32 --num_steps 2000000 --num_evals 200 --eval_interval 1024 (--cpu)
 ```
 
 #### Comparison with Baselines
@@ -79,7 +79,7 @@ python main.py --alg FlipBit32 --num_steps 2000000 --num_evals 200 --eval_interv
 To run these experiments (here 32 bits flipping is taken as an example):
 
 ```bash
-python main.py --alg FetchPush-v1 --num_steps 2000000 --num_evals 200 --eval_interval 19200 (--cpu)
+python main.py --alg HTRPO --env FetchPush-v1 --num_steps 2000000 --num_evals 200 --eval_interval 19200 (--cpu)
 ```
 
 ### Paper
