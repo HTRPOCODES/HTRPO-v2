@@ -123,15 +123,16 @@ TRPO_CONFIG = {
     'step_frac': .5
 }
 
-HTRPO_CONFIG = {
-    'hindsight_steps': 10,
+HPG_CONFIG = {
     'sampled_goal_num': 10,
     'goal_space': None,
     'per_decision': True,
     'weighted_is': True,
     'using_hgf_goals' : True,
-    'using_KL_estimation' : True,
-    'using_hpg': False,
     'using_original_data': False,
+    'using_her_reward': False,
+}
+
+HTRPO_CONFIG = {
     'KL_esti_method_for_TRPO' : 'kl2',
 }
