@@ -58,8 +58,29 @@ Continuous: FetchReach-v1, FetchPush-v1, FetchSlide-v1, FetchPickAndPlace-v1
 
 All the listed names can be directly used in command line for training policies.
 
-### Problem Shoot
-When using input normalization, the first update will fail because the initial mean and variance are morbid. This will be tackled with in the future version of this project.
+#### FlipBit
+
+| <img src="results/flipbit.png" width = "300" div align=left /> |
+|:---:|
+| FlipBit results|
+
+To run FilpBit experiments (here 32 bits flipping is taken as an example):
+
+```bash
+python main.py --alg FlipBit32 --num_steps 2000000 --num_evals 200 --eval_interval 1024 (--cpu)
+```
+
+#### Comparison with Baselines
+
+| <img src="results/baselines.png" width = "300" div align=left /> |
+|:---:|
+| Comparison results|
+
+To run these experiments (here 32 bits flipping is taken as an example):
+
+```bash
+python main.py --alg FetchPush-v1 --num_steps 2000000 --num_evals 200 --eval_interval 19200 (--cpu)
+```
 
 ### Paper
-This work is submitted to International Conference on Machine Learning (ICML) 2020 named Hindsight Trust Region Policy Optimization.
+This work is submitted to Thirty-fourth Conference on Neural Information Processing Systems named Hindsight Trust Region Policy Optimization.
