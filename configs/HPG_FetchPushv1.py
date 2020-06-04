@@ -1,10 +1,8 @@
 from torch.nn import functional as F
 
-HTRPOconfig = {
-    'cg_damping': 1e-3,
+HPGconfig = {
     'reward_decay': 0.98,
     'GAE_lambda': 0.,
-    'max_kl_divergence': 2e-5,
     'entropy_weight': 0,
     'per_decision': True,
     'weighted_is': True,
@@ -21,11 +19,6 @@ HTRPOconfig = {
     'sampled_goal_num': 100,
     'value_type': 'FC',
     'using_original_data': False,
-    'act_func': F.tanh,
     'out_act_func': F.tanh,
-    'using_kl2':True,
-    'using_hgf_goals': True,
-    'KL_esti_method_for_TRPO': 'origin'
-
 }
-HTRPOconfig['memory_size'] = HTRPOconfig['steps_per_iter']
+HPGconfig['memory_size'] = HPGconfig['steps_per_iter']

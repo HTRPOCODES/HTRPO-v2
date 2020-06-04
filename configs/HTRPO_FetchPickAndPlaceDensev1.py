@@ -21,11 +21,9 @@ HTRPOconfig = {
     'sampled_goal_num': 100,
     'value_type': 'FC',
     'using_original_data': False,
-    'act_func': F.tanh,
     'out_act_func': F.tanh,
     'using_kl2':True,
-    'using_hgf_goals': True,
-    'KL_esti_method_for_TRPO': 'origin'
+    'using_hgf_goals': True
 
 }
 HTRPOconfig['memory_size'] = HTRPOconfig['steps_per_iter']

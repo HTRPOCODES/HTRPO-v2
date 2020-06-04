@@ -3,7 +3,6 @@ HTRPOconfig = {
     'cg_damping': 1e-3,
     'GAE_lambda': 0.,
     'max_kl_divergence': 2e-5,
-    #'entropy_weight':0.003,
     'per_decision': True,
     'weighted_is': True,
     'using_active_goals' : True,
@@ -15,11 +14,13 @@ HTRPOconfig = {
     # for comparison with HPG
     'lr': 5e-4,
     # NEED TO FOCUS ON THESE PARAMETERS
-    'using_hpg': True,
     'steps_per_iter': 1600,
     'sampled_goal_num': 100,
-    'value_type': None,
+    'value_type': "FC",
     'using_original_data': False,
-    'using_kl2':True
+    'using_kl2':True,
+    'using_hgf_goals': True,
+    'KL_esti_method_for_TRPO': 'origin'
+
 }
 HTRPOconfig['memory_size'] = HTRPOconfig['steps_per_iter']

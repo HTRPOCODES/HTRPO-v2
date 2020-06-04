@@ -17,7 +17,7 @@ HTRPOconfig = {
     # for comparison with HPG
     'lr': 3e-5,
     # NEED TO FOCUS ON THESE PARAMETERS
-    'using_hpg': True,
+    'using_hpg': False,
     'steps_per_iter': 300,
     'sampled_goal_num': 16,
     'value_type': None,
