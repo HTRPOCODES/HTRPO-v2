@@ -1,6 +1,7 @@
 # Hindsight Trust Region Policy Optimization
 
 ## Log
+[04/06/2020] A new version of HTRPO with much higher performance especially in Discrete Robotic Control Tasks.
 
 [25/03/2020] Fix some bugs.
 
