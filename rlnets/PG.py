@@ -35,7 +35,9 @@ class FCPG_Gaussian(MLP):
 
     def forward(self,x, other_data = None):
         x = MLP.forward(self, x, other_data)
-        return x, self.logstd.expand_as(x), torch.exp(self.logstd).expand_as(x)
+        # for exploration, we need to make sure that the std is not too low.
+        logstd = torch.clamp(self.logstd, min = np.log(0.1))
+        return x, logstd.expand_as(x), torch.exp(logstd).expand_as(x)
 
     def cuda(self, device = None):
         self.logstd.cuda()
@@ -65,6 +67,13 @@ class FCPG_Softmax(MLP):
                  initializer,
                  initializer_param=initializer_param,
                  )
+
+    def forward(self, x, other_data=None):
+        x = MLP.forward(self, x, other_data)
+        # for exploration, and similar to e-greedy
+        x = x + 0.01 / self.n_actions
+        x = x / torch.sum(x, dim = -1, keepdim=True).detach()
+        return x
 
 class ConvPG_Softmax(Conv):
     def __init__(self,
@@ -96,6 +105,13 @@ class ConvPG_Softmax(Conv):
                  initializer,
                  initializer_param=initializer_param,
                  )
+
+    def forward(self, x, other_data=None):
+        x = Conv.forward(self, x, other_data)
+        # for exploration, and similar to e-greedy
+        x = x + 0.01 / self.n_actions
+        x = x / torch.sum(x, dim=-1, keepdim=True).detach()
+        return x
 
 # TODO: support multi-layer value function in which action is concat before the final layer
 class FCVALUE(MLP):
