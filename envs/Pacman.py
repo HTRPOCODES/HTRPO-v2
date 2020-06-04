@@ -317,7 +317,7 @@ class MsPacman(AtariWrapper):
     def __init__(self, rom_path=b"/data0/svc4/ms_pacman.bin",
                  randomstart=False,
                  max_steps=26,
-                 reward_type='sparse'):
+                 reward='sparse'):
 
         AtariWrapper.__init__(self, rom_path,
                               frameskip=13,
@@ -326,7 +326,7 @@ class MsPacman(AtariWrapper):
                               )
 
         self.max_episode_steps = max_steps
-        self.reward_type = reward_type
+        self.reward_type = reward
         self.acc_rew = 0
 
         self.all_saved_states = self.generate_saved_states(randomstart)
@@ -485,7 +485,7 @@ class MsPacman(AtariWrapper):
             else:
                 reward = -1.0
         else:
-            reward = np.abs(np.array(self.new_grid_loc) - np.array(self.goal)).sum()
+            reward = - np.abs(np.array(self.new_grid_loc) - np.array(self.goal)).sum()
         self.acc_rew += reward
 
         done = (self.max_episode_steps <= self.n_steps) or (reward == 0.0) or (lives_before > lives_after)

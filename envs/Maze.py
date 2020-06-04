@@ -170,26 +170,3 @@ class Maze(object):
             s.append('\n')
 
         return ''.join(s)
-
-class EmptyMaze(Maze):
-    def __init__(self, reward = 'sparse'):
-        super(EmptyMaze, self).__init__(layout=np.ones((11, 11), dtype=np.int), max_steps = 32, entries=[(0, 0)],
-                                        reward = reward)
-
-class FourRoomMaze(Maze):
-    def __init__(self, reward = 'sparse'):
-        layout = np.ones(shape=(11, 11), dtype=np.int)
-
-        # Walls
-        layout[:, 5] = 0
-        layout[5, :5] = 0
-        layout[6, 6:] = 0
-
-        # Doors
-        layout[5, 1] = 1
-        layout[2, 5] = 1
-        layout[6, 8] = 1
-        layout[9, 5] = 1
-        super(FourRoomMaze, self).__init__(layout = layout, max_steps=32,
-                                           entries=[(0, 0), (0, 10), (10, 0), (10, 10)],
-                                           epsilon=0.2, reward = reward)

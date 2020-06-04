@@ -56,7 +56,10 @@ class FetchReachDiscrete(object):
 
             `cartprod` takes combinations of actions as input
         """
-        self.env = gym.make("FetchReach-v1")
+        if reward == "sparse":
+            self.env = gym.make("FetchReach-v1")
+        else:
+            self.env = gym.make("FetchReachDense-v1")
 
         self.action_directions = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
         self.valid_action_directions = np.float32(np.any(self.action_directions, axis=0))
@@ -192,8 +195,10 @@ class FetchPushDiscrete(FetchReachDiscrete):
                  action_mode="impulsemixed", action_buckets=[-1, 0, 1],
                  action_stepsize=[0.1, 1.0],
                  reward="sparse"):
-
-        self.env = gym.make("FetchPush-v1")
+        if reward == "sparse":
+            self.env = gym.make("FetchPush-v1")
+        else:
+            self.env = gym.make("FetchPushDense-v1")
 
         self.action_directions = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
         self.valid_action_directions = np.float32(np.any(self.action_directions, axis=0))
@@ -220,11 +225,10 @@ class FetchSlideDiscrete(FetchReachDiscrete):
                  action_stepsize=[0.1, 1.0],
                  reward="sparse"):
 
-        try:
+        if reward == "sparse":
             self.env = gym.make("FetchSlide-v1")
-        except Exception as e:
-            print("You do not have the latest version of gym (gym-0.10.5). Falling back to v0 with movable table")
-            self.env = gym.make("FetchSlide-v0")
+        else:
+            self.env = gym.make("FetchSlideDense-v1")
 
         self.action_directions = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
         self.valid_action_directions = np.float32(np.any(self.action_directions, axis=0))

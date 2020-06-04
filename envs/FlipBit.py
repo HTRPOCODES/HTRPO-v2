@@ -23,7 +23,6 @@ class FlipBit(object):
         self.acc_rew = 0
         self.n_steps = 0
         self.state = np.zeros(self.d_observations, dtype=np.int32)
-        # self.state = np.random.randint(0, 2, size=self.d_observations)
         self.goal = np.random.randint(0, 2, size=self.d_goals, dtype=np.int32)
         state, goal = np.array(self.state), np.array(self.goal)
         obs = {
@@ -83,19 +82,3 @@ class FlipBit(object):
 
     def __repr__(self):
         return 'State: {0}. Goal: {1}.'.format(self.state, self.goal)
-
-class FlipBit8(FlipBit):
-    def __init__(self, reward = 'sparse'):
-        super(FlipBit8, self).__init__(n_bits = 8, reward = reward)
-
-class FlipBit16(FlipBit):
-    def __init__(self, reward = 'sparse'):
-        super(FlipBit16, self).__init__(n_bits = 16, reward = reward)
-
-class FlipBit32(FlipBit):
-    def __init__(self, reward = 'sparse'):
-        super(FlipBit32, self).__init__(n_bits = 32, reward = reward)
-
-class FlipBit48(FlipBit):
-    def __init__(self, reward = 'sparse'):
-        super(FlipBit48, self).__init__(n_bits = 48, reward = reward)
