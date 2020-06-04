@@ -1,11 +1,5 @@
 # parant class for all agent
 import torch
-from torch import nn
-from torch.autograd import Variable
-import torch.nn.functional as F
-from torch import optim
-import numpy as np
-import basenets
 import abc
 import copy
 from .config import AGENT_CONFIG
@@ -93,7 +87,7 @@ class Agent:
 
     def eval_brain(self, env, render=True, eval_num=None):
         eprew_list = deque(maxlen=eval_num)
-        # success_history = deque(maxlen=eval_num)
+        success_history = deque(maxlen=eval_num)
         self.policy = self.policy.eval()
         if self.value is not None:
             self.value = self.value.eval()
@@ -114,17 +108,20 @@ class Agent:
                 goal = None
 
             if not self.dicrete_action:
-                actions, _, _, _ = self.choose_action(observation, other_data=goal, greedy=False)
+                actions, _, _, _ = self.choose_action(observation, other_data=goal, greedy=True)
             else:
-                actions, _ = self.choose_action(observation, other_data=goal, greedy=False)
+                actions, _ = self.choose_action(observation, other_data=goal, greedy=True)
             actions = actions.cpu().numpy()
             observation, rewards, dones, infos = env.step(actions)
             for e, info in enumerate(infos):
                 if dones[e]:
                     eprew_list.append(info.get('episode')['r'] + self.max_steps)
-                    # success_history.append(info.get('is_success'))
+                    if 'is_success' in info.keys():
+                        success_history.append(info.get('is_success'))
                     for k in observation.keys():
                         observation[k][e] = info.get('new_obs')[k]
 
-        # return eprew_list, success_history
-        return eprew_list,
+        if len(success_history) > 0:
+            return eprew_list, success_history
+        else:
+            return eprew_list

@@ -91,69 +91,72 @@ class PG(Agent):
     def mean_kl_divergence(self, inds = None, model= None):
         raise NotImplementedError("Must be implemented in subclass.")
 
-    def estimate_value(self):
-        # undone but the final state.
+    def estimate_value_with_approximator(self):
         fake_done = torch.nonzero(self.done.squeeze() == 2).squeeze(-1)
-        # make all fake_done equal to 1
         self.done[self.done == 2] = 1
         returns = torch.zeros(self.r.size(0), 1).type_as(self.s)
-        prev_return = 0
-        # using value approximator
+        values = self.value(self.s, other_data=self.other_data)
+        delta = torch.zeros(self.r.size(0), 1).type_as(self.s)
+        advantages = torch.zeros(self.r.size(0), 1).type_as(self.s)
+
+        # mask is a 1-d vector, therefore, e_points is also a 1-d vector
+        e_points = torch.nonzero(self.done.squeeze() == 1).squeeze()
+        b_points = - torch.ones(size=e_points.size()).type_as(e_points)
+        b_points[1:] = e_points[:-1]
+        ep_lens = e_points - b_points
+        assert ep_lens.min().item() > 0, "Some episode lengths are smaller than 0."
+        max_len = torch.max(ep_lens).item()
+        uncomplete_flag = ep_lens > 0
+
+        delta[e_points] = self.r[e_points] - values[e_points]
+        if fake_done.numel() > 0:
+            delta[fake_done] += self.value(self.s_[fake_done],
+                                           other_data=self.other_data[fake_done]
+                                           if self.other_data is not None else None).resize_as(delta[fake_done])
+        advantages[e_points] = delta[e_points]
+        returns[e_points] = self.r[e_points]
+        for i in range(1, max_len):
+            uncomplete_flag[ep_lens <= i] = 0
+            # TD-error
+            inds = (e_points - i)[uncomplete_flag]
+            delta[inds] = self.r[inds] + self.gamma * values[inds + 1] - values[inds]
+            advantages[inds] = delta[inds] + self.gamma * self.lamb * advantages[inds + 1]
+            returns[inds] = self.r[inds] + self.gamma * returns[inds + 1]
+
+        # Estimated Return, from OpenAI baseline.
+        esti_return = values + advantages
+        # values returns advantages and estimated returns
+        self.V = values.squeeze().detach()
+        self.R = returns.squeeze().detach()
+        self.A = advantages.squeeze().detach()
+        self.esti_R = esti_return.squeeze().detach()
+
+    def estimate_value_with_mc(self):
+        self.done[self.done == 2] = 1
+        returns = torch.zeros(self.r.size(0), 1).type_as(self.s)
+        e_points = torch.nonzero(self.done.squeeze() == 1).squeeze()
+        b_points = - torch.ones(size=e_points.size()).type_as(e_points)
+        b_points[1:] = e_points[:-1]
+        ep_lens = e_points - b_points
+        assert ep_lens.min().item() > 0, "Some episode lengths are smaller than 0."
+        max_len = torch.max(ep_lens).item()
+        uncomplete_flag = ep_lens > 0
+        returns[e_points] = self.r[e_points]
+        for i in range(1, max_len):
+            uncomplete_flag[ep_lens <= i] = 0
+            inds = (e_points - i)[uncomplete_flag]
+            returns[inds] = self.r[inds] + self.gamma * returns[inds + 1]
+
+        self.R = returns.squeeze().detach()
+        # Here self.A is actually not advantages. It works for policy updates, which
+        # means that it is used to measure how good a action is.
+        self.A = self.R
+
+    def estimate_value(self):
         if self.value_type is not None:
-            values = self.value(self.s, other_data = self.other_data)
-            delta = torch.zeros(self.r.size(0), 1).type_as(self.s)
-            advantages = torch.zeros(self.r.size(0), 1).type_as(self.s)
-
-            # mask is a 1-d vector, therefore, e_points is also a 1-d vector
-            e_points = torch.nonzero(self.done.squeeze() == 1).squeeze()
-            b_points = - torch.ones(size = e_points.size()).type_as(e_points)
-            b_points[1:] = e_points[:-1]
-            ep_lens = e_points - b_points
-            assert ep_lens.min().item() > 0, "Some episode lengths are smaller than 0."
-            max_len = torch.max(ep_lens).item()
-            uncomplete_flag = ep_lens > 0
-
-            delta[e_points] = self.r[e_points] - values[e_points]
-            if fake_done.numel() > 0:
-                delta[fake_done] += self.value(self.s_[fake_done],
-                                               other_data = self.other_data[fake_done]
-                                               if self.other_data is not None else None).resize_as(delta[fake_done])
-            advantages[e_points] = delta[e_points]
-            returns[e_points] = self.r[e_points]
-            for i in range(1, max_len):
-                uncomplete_flag[ep_lens <= i] = 0
-                # TD-error
-                inds = (e_points - i)[uncomplete_flag]
-                delta[inds] = self.r[inds] + self.gamma * values[inds + 1] - values[inds]
-                advantages[inds] = delta[inds] + self.gamma * self.lamb * advantages[inds + 1]
-                returns[inds] = self.r[inds] + self.gamma * returns[inds + 1]
-
-            # Estimated Return, from OpenAI baseline.
-            esti_return = values + advantages
-            # values returns advantages and estimated returns
-            self.V = values.squeeze().detach()
-            self.R = returns.squeeze().detach()
-            self.A = advantages.squeeze().detach()
-            self.esti_R = esti_return.squeeze().detach()
-
+            self.estimate_value_with_approximator()
         else:
-            e_points = torch.nonzero(self.done.squeeze() == 1).squeeze()
-            b_points = - torch.ones(size = e_points.size()).type_as(e_points)
-            b_points[1:] = e_points[:-1]
-            ep_lens = e_points - b_points
-            assert ep_lens.min().item() > 0, "Some episode lengths are smaller than 0."
-            max_len = torch.max(ep_lens).item()
-            uncomplete_flag = ep_lens > 0
-            returns[e_points] = self.r[e_points]
-            for i in range(1, max_len):
-                uncomplete_flag[ep_lens <= i] = 0
-                inds = (e_points - i)[uncomplete_flag]
-                returns[inds] = self.r[inds] + self.gamma * returns[inds + 1]
-
-            self.R = returns.squeeze().detach()
-            # Here self.A is actually not advantages. It works for policy updates, which
-            # means that it is used to measure how good a action is.
-            self.A = self.R
+            self.estimate_value_with_mc()
 
     def optim_value_lbfgs(self,V_target, inds):
         value = self.value

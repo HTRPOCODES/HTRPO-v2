@@ -88,7 +88,6 @@ class NPG(PG):
         self.cur_kl = self.mean_kl_divergence().item()
         self.policy_ent = self.compute_entropy().item()
 
-
 class NPG_Gaussian(NPG, PG_Gaussian):
     def __init__(self,hyperparams):
         super(NPG_Gaussian, self).__init__(hyperparams)

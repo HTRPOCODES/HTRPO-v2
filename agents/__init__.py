@@ -10,3 +10,4 @@ from .NPG import *
 from .PPO import *
 from .TD3 import *
 from .HTRPO import *
+from .HPG import *

@@ -39,11 +39,10 @@ class TRPO(NPG):
             newfval, curkl = self.object_loss(xnew)
             actual_improve = fval - newfval
             expected_improve = expected_improve_rate * stepfrac
-            if not expected_improve.item() >= 1 and not expected_improve.item() < 1:
-                pass
             ratio = actual_improve / expected_improve
-            print("Search number {}...".format(_n_backtracks + 1) + " Actual improve: {:.5f}".format(actual_improve) +
-                  " Expected improve: {:.5f}".format(expected_improve) + " Current KL: {:.8f}".format(curkl))
+            print("Search number {}...".format(_n_backtracks + 1),  "Step Frac:{:.5f}".format(stepfrac),
+                  " Actual improve: {:.5f}".format(actual_improve) , " Expected improve: {:.5f}".format(expected_improve),
+                  " Current KL: {:.8f}".format(curkl))
             if ratio.item() > accept_ratio and actual_improve.item() > 0 and 0 < curkl < self.max_kl * 1.5:
                 self.improvement = actual_improve.item()
                 self.expected_improvement = expected_improve.item()
